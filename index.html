@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#bfe6ff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Egg Draw</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="game-container">
+  <div id="frame">
+    <canvas id="game-canvas" tabindex="0"></canvas>
+  </div>
+
+  <div id="hud" class="overlay hidden">
+    <div id="timer-display">0:30</div>
+    <button id="btn-retry-icon" class="icon-btn icon-btn-right" aria-label="Retry level">&#8635;</button>
+    <button id="btn-level-select-icon" class="icon-btn icon-btn-left" aria-label="Level select">&#9776;</button>
+  </div>
+
+  <div id="screen-menu" class="screen overlay">
+    <h1>Egg Draw</h1>
+    <p class="subtitle">Draw a shape, let it fall, and crack every bad egg before time runs out.</p>
+    <div class="btn-group">
+      <button id="btn-play" class="btn btn-primary">Play</button>
+      <button id="btn-level-select-menu" class="btn btn-secondary">Level Select</button>
+    </div>
+  </div>
+
+  <div id="screen-level-select" class="screen overlay hidden">
+    <h2>Select a Level</h2>
+    <div id="level-select-group" class="level-select-group"></div>
+    <button id="btn-back-to-menu" class="btn btn-secondary">Back</button>
+  </div>
+
+  <div id="screen-success" class="screen overlay hidden">
+    <h2 id="success-text">Level cleared!</h2>
+    <div class="btn-group">
+      <button id="btn-continue" class="btn btn-primary">Continue</button>
+      <button id="btn-menu-success" class="btn btn-secondary">Menu</button>
+    </div>
+  </div>
+
+  <div id="screen-fail" class="screen overlay hidden">
+    <h2>Out of time!</h2>
+    <p class="subtitle">Some bad eggs are still smiling. Try again?</p>
+    <div class="btn-group">
+      <button id="btn-retry" class="btn btn-primary">Retry</button>
+      <button id="btn-menu-fail" class="btn btn-secondary">Menu</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/vendor/matter.min.js"></script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
