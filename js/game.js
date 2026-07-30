@@ -1,5 +1,5 @@
 import { LEVELS, parseLevel, COLORS, DESIGN_WIDTH, DESIGN_HEIGHT, WATER_HEIGHT } from './levels.js';
-import { createWorld, addPlatform, addEgg, addWater, addDrawnBody, removeBody, step, onCollisionStart } from './physics.js';
+import { createWorld, addPlatform, addSwingPlatform, addEgg, addWater, addWorldBounds, addDrawnBody, removeBody, step, onCollisionStart } from './physics.js';
 import { Drawing, drawBrushPath, STROKE_THICKNESS } from './drawing.js';
 import { BadEgg } from './egg.js';
 import { Timer } from './timer.js';
@@ -32,6 +32,7 @@ export class Game {
     this.engine = null;
     this.level = null;
     this.eggs = [];
+    this.swings = [];
     this.drawnBody = null;
     this.drawnLocalPoints = null;
     this.pendingSuccess = false;
@@ -141,12 +142,14 @@ export class Game {
     this.engine = createWorld();
     for (const p of this.level.platforms) addPlatform(this.engine, p);
     this.eggs = this.level.eggs.map((e) => new BadEgg(e, addEgg(this.engine, e)));
+    this.swings = this.level.swings.map((cfg) => ({ cfg, body: addSwingPlatform(this.engine, cfg) }));
     addWater(this.engine, {
       x: DESIGN_WIDTH / 2,
       y: DESIGN_HEIGHT - WATER_HEIGHT / 2,
       width: DESIGN_WIDTH,
       height: WATER_HEIGHT,
     });
+    addWorldBounds(this.engine, DESIGN_WIDTH, DESIGN_HEIGHT);
     this.drawnBody = null;
     this.drawnLocalPoints = null;
 
@@ -276,6 +279,8 @@ export class Game {
       for (const p of this.level.platforms) this._drawPlatform(ctx, p);
     }
 
+    for (const swing of this.swings) this._drawSwing(ctx, swing);
+
     for (const egg of this.eggs) egg.draw(ctx, time);
 
     if (this.drawnBody) {
@@ -319,6 +324,23 @@ export class Game {
     ctx.lineWidth = 3;
     ctx.stroke();
     ctx.restore();
+  }
+
+  _drawSwing(ctx, swing) {
+    const { cfg, body } = swing;
+    ctx.strokeStyle = COLORS.platformEdge;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cfg.pivotX, cfg.pivotY);
+    ctx.lineTo(body.position.x, body.position.y);
+    ctx.stroke();
+
+    ctx.fillStyle = COLORS.platformEdge;
+    ctx.beginPath();
+    ctx.arc(cfg.pivotX, cfg.pivotY, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    this._drawPlatform(ctx, { x: body.position.x, y: body.position.y, width: cfg.width, height: cfg.height, angle: 0 });
   }
 
   _drawWater(ctx, time) {
