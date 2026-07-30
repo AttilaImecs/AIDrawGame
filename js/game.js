@@ -1,4 +1,4 @@
-import { LEVELS, parseLevel, COLORS, DESIGN_WIDTH, DESIGN_HEIGHT, WATER_HEIGHT } from './levels.js';
+import { LEVELS, parseLevel, COLORS, DESIGN_WIDTH, DESIGN_HEIGHT, WATER_HEIGHT, DRAW_ZONE_HEIGHT } from './levels.js';
 import { createWorld, addPlatform, addSwingPlatform, addEgg, addWater, addWorldBounds, addDrawnBody, removeBody, step, onCollisionStart } from './physics.js';
 import { Drawing, drawBrushPath, STROKE_THICKNESS } from './drawing.js';
 import { BadEgg } from './egg.js';
@@ -275,6 +275,10 @@ export class Game {
     this._drawSky(ctx);
     this._drawClouds(ctx, time);
 
+    if (this.status === STATUS.READY || this.status === STATUS.DRAWING) {
+      this._drawDrawZone(ctx);
+    }
+
     if (this.level) {
       for (const p of this.level.platforms) this._drawPlatform(ctx, p);
     }
@@ -290,6 +294,19 @@ export class Game {
     }
 
     this._drawWater(ctx, time);
+  }
+
+  _drawDrawZone(ctx) {
+    ctx.fillStyle = COLORS.drawZone;
+    ctx.fillRect(0, 0, this.canvas.width, DRAW_ZONE_HEIGHT);
+    ctx.strokeStyle = COLORS.drawZoneEdge;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([10, 8]);
+    ctx.beginPath();
+    ctx.moveTo(0, DRAW_ZONE_HEIGHT);
+    ctx.lineTo(this.canvas.width, DRAW_ZONE_HEIGHT);
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   _drawSky(ctx) {

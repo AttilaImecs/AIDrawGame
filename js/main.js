@@ -1,7 +1,5 @@
 import { Game } from './game.js';
 import { UI } from './ui.js';
-import { LEVELS } from './levels.js';
-import { getUnlockedCount } from './progress.js';
 
 // Register service worker for offline PWA install. Failures are non-fatal
 // (e.g. http://localhost in some browsers blocks SW).
@@ -15,10 +13,9 @@ const canvas = document.getElementById('game-canvas');
 const ui = new UI();
 const game = new Game(canvas, ui);
 
-ui.onPlay(() => {
-  const index = Math.max(0, Math.min(getUnlockedCount(LEVELS.length) - 1, LEVELS.length - 1));
-  game.startLevel(index);
-});
+// Play always starts at level 1 - Level Select (which lists every level
+// while progress-gating is disabled, see progress.js) is how to jump ahead.
+ui.onPlay(() => game.startLevel(0));
 ui.onLevelSelectFromMenu(() => game.goToLevelSelect());
 ui.onSelectLevel((index) => game.startLevel(index));
 ui.onBackToMenu(() => game.goToMenu());

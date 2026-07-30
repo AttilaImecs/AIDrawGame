@@ -1,15 +1,11 @@
 const STORAGE_KEY = 'eggDrawUnlocked';
 
+// All levels are shown in level select for now, regardless of progress -
+// the "only show previously-beaten levels" lock was hiding newly-added
+// levels from view during active development. Re-gate this once the level
+// set stabilizes.
 export function getUnlockedCount(totalLevels) {
-  let raw = null;
-  try {
-    raw = localStorage.getItem(STORAGE_KEY);
-  } catch (e) {
-    // localStorage unavailable (private mode, etc.) - fall back to level 1 only.
-  }
-  const n = raw ? parseInt(raw, 10) : 1;
-  const safe = Number.isFinite(n) && n > 0 ? n : 1;
-  return Math.min(safe, totalLevels);
+  return totalLevels;
 }
 
 export function markLevelComplete(index, totalLevels) {

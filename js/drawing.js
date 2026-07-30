@@ -1,4 +1,5 @@
 import { computeHull } from './physics.js';
+import { DRAW_ZONE_HEIGHT } from './levels.js';
 
 export const STROKE_THICKNESS = 12;
 const MIN_POINT_DISTANCE = 6;
@@ -39,9 +40,14 @@ export class Drawing {
     // Strict one-object-per-attempt guard: once a stroke has been finished,
     // every further pointerdown is a total no-op until reset() is called.
     if (this.hasDrawn || this.isDrawing) return;
+    const p = this._toCanvasSpace(e);
+    // Drawing only starts inside the top-third zone (see the translucent
+    // overlay in game.js) - a touch/click below it is a no-op, same as if
+    // the player had already used their one attempt.
+    if (p.y > DRAW_ZONE_HEIGHT) return;
     e.preventDefault();
     this.isDrawing = true;
-    this.points = [this._toCanvasSpace(e)];
+    this.points = [p];
     try {
       this.canvas.setPointerCapture?.(e.pointerId);
     } catch (err) {
@@ -54,6 +60,10 @@ export class Drawing {
     if (!this.isDrawing) return;
     e.preventDefault();
     const p = this._toCanvasSpace(e);
+    // Clamp instead of rejecting: if the pointer drifts below the drawable
+    // zone mid-stroke, keep the shape pinned at the boundary rather than
+    // dropping points, so the stroke stays smooth and can't reach eggs.
+    p.y = Math.min(p.y, DRAW_ZONE_HEIGHT);
     const last = this.points[this.points.length - 1];
     if (Math.hypot(p.x - last.x, p.y - last.y) >= MIN_POINT_DISTANCE) {
       this.points.push(p);
