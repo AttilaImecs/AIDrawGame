@@ -1,4 +1,4 @@
-const CACHE = 'egg-draw-v1';
+const CACHE = 'egg-draw-v2';
 const ASSETS = [
   './',
   './index.html',
