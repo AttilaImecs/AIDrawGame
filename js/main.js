@@ -54,6 +54,7 @@ ui.onEditorPropertyAction((action, delta) => {
 });
 ui.onEditorTest(() => editor.testLevel(game));
 ui.onEditorPublish(() => editor.publish());
+ui.onEditorClear(() => editor.clearDraft());
 ui.onDeletePublishedLevel((id) => editor.deletePublished(id));
 
 ui.showMenu();

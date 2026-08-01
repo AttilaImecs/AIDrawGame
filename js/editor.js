@@ -109,6 +109,18 @@ export class Editor {
     this._save();
   }
 
+  clearDraft() {
+    if (this.draft.platforms.length === 0 && this.draft.eggs.length === 0 && this.draft.swings.length === 0) return;
+    if (!window.confirm('Clear all eggs, platforms, and swings from this level?')) return;
+    this.draft.platforms = [];
+    this.draft.eggs = [];
+    this.draft.swings = [];
+    this.draft.verifiedSnapshot = null;
+    this.selected = null;
+    this._save();
+    this.ui.setEditorMessage('Level cleared.');
+  }
+
   // ---- Test / publish ----
 
   testLevel(game) {

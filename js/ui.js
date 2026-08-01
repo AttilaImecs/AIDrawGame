@@ -31,6 +31,7 @@ export class UI {
     this.editorPropertyPanel = document.getElementById('editor-property-panel');
     this.btnEditorTest = document.getElementById('btn-editor-test');
     this.btnEditorPublish = document.getElementById('btn-editor-publish');
+    this.btnEditorClear = document.getElementById('btn-editor-clear');
     this.btnEditorBack = document.getElementById('btn-editor-back');
     this.editorPublishedList = document.getElementById('editor-published-list');
 
@@ -284,6 +285,10 @@ export class UI {
 
   onEditorPublish(callback) {
     this.btnEditorPublish.addEventListener('click', callback);
+  }
+
+  onEditorClear(callback) {
+    this.btnEditorClear.addEventListener('click', callback);
   }
 
   onDeletePublishedLevel(callback) {
