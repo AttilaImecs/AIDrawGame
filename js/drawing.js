@@ -19,6 +19,11 @@ export class Drawing {
     this.hasDrawn = false;
     this.onStart = null;
     this.onFinish = null;
+    // Off while the level editor owns the canvas, so a tap inside the
+    // top-third zone while editing isn't also captured as a draw attempt -
+    // these listeners are attached for the app's whole lifetime and
+    // otherwise have no notion of whether a level is even running.
+    this.enabled = true;
 
     canvas.addEventListener('pointerdown', (e) => this._handleDown(e));
     canvas.addEventListener('pointermove', (e) => this._handleMove(e));
@@ -37,6 +42,7 @@ export class Drawing {
   }
 
   _handleDown(e) {
+    if (!this.enabled) return;
     // Strict one-object-per-attempt guard: once a stroke has been finished,
     // every further pointerdown is a total no-op until reset() is called.
     if (this.hasDrawn || this.isDrawing) return;

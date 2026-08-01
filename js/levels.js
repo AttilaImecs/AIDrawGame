@@ -5,6 +5,11 @@ export const WATER_HEIGHT = 90;
 // platforms/eggs) lives in the bottom two-thirds so the player can't just
 // draw directly on top of an egg.
 export const DRAW_ZONE_HEIGHT = DESIGN_HEIGHT / 3;
+// The size every level's eggs already use - a single source of truth for
+// the level editor's fixed egg placement size, instead of a new duplicated
+// magic number.
+export const DEFAULT_EGG_WIDTH = 66.7;
+export const DEFAULT_EGG_HEIGHT = 86.7;
 
 export const COLORS = {
   skyTop: '#bfe6ff',

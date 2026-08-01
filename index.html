@@ -29,6 +29,7 @@
     <div class="btn-group">
       <button id="btn-play" class="btn btn-primary">Play</button>
       <button id="btn-level-select-menu" class="btn btn-secondary">Level Select</button>
+      <button id="btn-open-editor" class="btn btn-secondary">Level Editor</button>
     </div>
   </div>
 
@@ -52,6 +53,30 @@
     <div class="btn-group">
       <button id="btn-retry" class="btn btn-primary">Retry</button>
       <button id="btn-menu-fail" class="btn btn-secondary">Menu</button>
+    </div>
+  </div>
+
+  <div id="screen-editor" class="overlay hidden">
+    <div id="editor-top-bar">
+      <input id="editor-name-input" class="text-input" type="text" placeholder="Level name" maxlength="40">
+      <button id="btn-editor-back" class="btn btn-secondary">Back</button>
+    </div>
+
+    <div id="editor-toolbar" class="editor-toolbar">
+      <button class="btn tool-btn btn-primary" data-tool="select">Select</button>
+      <button class="btn tool-btn btn-secondary" data-tool="egg">Egg</button>
+      <button class="btn tool-btn btn-secondary" data-tool="platform">Platform</button>
+      <button class="btn tool-btn btn-secondary" data-tool="swing">Swing</button>
+    </div>
+
+    <div id="editor-bottom-panel" class="property-panel">
+      <div id="editor-message" class="editor-message"></div>
+      <div id="editor-property-panel" class="property-panel-row"></div>
+      <div class="btn-group">
+        <button id="btn-editor-test" class="btn btn-primary" disabled>Test Level</button>
+        <button id="btn-editor-publish" class="btn btn-primary" disabled>Publish</button>
+      </div>
+      <div id="editor-published-list" class="published-list"></div>
     </div>
   </div>
 </div>

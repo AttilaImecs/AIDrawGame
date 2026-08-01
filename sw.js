@@ -1,4 +1,4 @@
-const CACHE = 'egg-draw-v2';
+const CACHE = 'egg-draw-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -14,6 +14,9 @@ const ASSETS = [
   './js/progress.js',
   './js/timer.js',
   './js/music.js',
+  './js/render.js',
+  './js/customLevels.js',
+  './js/editor.js',
   './js/vendor/matter.min.js',
   './icons/icon-192.png',
   './icons/icon-512.png',

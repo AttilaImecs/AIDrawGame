@@ -50,9 +50,17 @@ export function addPlatform(engine, { x, y, width, height, angle = 0, isStopper 
   return body;
 }
 
-export function addEgg(engine, { x, y, width, height }) {
+// `pinned` (default false, matching every built-in level's eggs, which never
+// set this key) makes the egg a static body - perfectly still regardless of
+// platform angle, no stopper peg needed. Used by the level editor so casual
+// creators don't have to deal with stopper-peg trigonometry. Must stay
+// false for any egg meant to ride a swing platform: a static body doesn't
+// respond to contact forces at all, so the plank would just swing out from
+// under it instead of carrying it along.
+export function addEgg(engine, { x, y, width, height, pinned = false }) {
   const radius = (width + height) / 4;
   const body = Bodies.circle(x, y, radius, {
+    isStatic: pinned,
     friction: 0.3,
     frictionStatic: LOW_STATIC_FRICTION,
     frictionAir: 0.01,

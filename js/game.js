@@ -1,10 +1,12 @@
-import { LEVELS, parseLevel, COLORS, DESIGN_WIDTH, DESIGN_HEIGHT, WATER_HEIGHT, DRAW_ZONE_HEIGHT } from './levels.js';
+import { parseLevel, COLORS, DESIGN_WIDTH, DESIGN_HEIGHT, WATER_HEIGHT } from './levels.js';
 import { createWorld, addPlatform, addSwingPlatform, addEgg, addWater, addWorldBounds, addDrawnBody, removeBody, step, onCollisionStart } from './physics.js';
 import { Drawing, drawBrushPath, STROKE_THICKNESS } from './drawing.js';
 import { BadEgg } from './egg.js';
 import { Timer } from './timer.js';
 import { playAmbientMusic, stopMusic } from './music.js';
 import { getUnlockedCount, markLevelComplete } from './progress.js';
+import { createClouds, drawSky, drawClouds, drawDrawZone, drawPlatform, drawSwingArm, drawWater } from './render.js';
+import { getCombinedLevels } from './customLevels.js';
 
 export const STATUS = {
   MENU: 'menu',
@@ -37,9 +39,12 @@ export class Game {
     this.drawnLocalPoints = null;
     this.pendingSuccess = false;
     this.successTimer = 0;
+    this.isCustomTest = false;
+    this.customTestCallback = null;
+    this._customLevelData = null;
 
     this.timer = new Timer();
-    this.clouds = this._createClouds();
+    this.clouds = createClouds();
 
     this.drawing = new Drawing(canvas);
     this.drawing.onStart = () => this._onDrawStart();
@@ -52,21 +57,6 @@ export class Game {
     }
     this.resizeCanvas();
     this.render(0);
-  }
-
-  _createClouds() {
-    const clouds = [];
-    for (let i = 0; i < 5; i++) {
-      clouds.push({
-        baseX: (DESIGN_WIDTH / 5) * i + DESIGN_WIDTH / 10,
-        y: 60 + Math.random() * 220,
-        size: 90 + Math.random() * 70,
-        amplitude: 40 + Math.random() * 90,
-        freq: 0.04 + Math.random() * 0.09,
-        phase: Math.random() * Math.PI * 2,
-      });
-    }
-    return clouds;
   }
 
   resizeCanvas() {
@@ -97,12 +87,18 @@ export class Game {
   }
 
   retryLevel() {
-    this.loadLevel(this.levelIndex);
+    if (this.isCustomTest) {
+      // this.levelIndex isn't a meaningful combined-list index during a
+      // custom test - replay the exact draft data instead of looking it up.
+      this._startWithLevelData(this._customLevelData);
+    } else {
+      this.loadLevel(this.levelIndex);
+    }
   }
 
   continueToNextLevel() {
     const next = this.levelIndex + 1;
-    if (next < LEVELS.length) {
+    if (next < getCombinedLevels().length) {
       this.startLevel(next);
     } else {
       this.goToMenu();
@@ -120,17 +116,49 @@ export class Game {
     this.status = STATUS.LEVEL_SELECT;
     this.stopLoop();
     stopMusic();
-    this.ui.showLevelSelect(getUnlockedCount(LEVELS.length));
+    this.ui.showLevelSelect(getUnlockedCount(getCombinedLevels().length));
   }
 
   loadLevel(index) {
-    const data = LEVELS[index];
+    this.isCustomTest = false;
+    const data = getCombinedLevels()[index];
+    this._startWithLevelData(data);
+  }
+
+  // Test-play a draft from the level editor through the real engine -
+  // physics, timer, HUD, the works - without touching progress tracking or
+  // the normal success/fail screens (see triggerSuccess/triggerFail).
+  // `onResult` is called with 'success' | 'fail' | 'abort'.
+  startCustomLevel(levelData, onResult) {
+    this.isCustomTest = true;
+    this.customTestCallback = onResult;
+    this._customLevelData = levelData;
+    this._startWithLevelData(levelData);
+  }
+
+  abortCustomTest() {
+    this.pause();
+    const callback = this.customTestCallback;
+    this.customTestCallback = null;
+    callback?.('abort');
+  }
+
+  // Stops the loop/music/drawing without changing status - used when the
+  // level editor opens over a level that's mid-play.
+  pause() {
+    this.stopLoop();
+    stopMusic();
+    this.drawing.enabled = false;
+  }
+
+  _startWithLevelData(data) {
     this.level = parseLevel(data);
     this._setupPhysics();
     this.timer.reset();
     this.pendingSuccess = false;
     this.successTimer = 0;
     this.drawing.reset();
+    this.drawing.enabled = true;
     this.status = STATUS.READY;
     this.ui.showPlaying();
     playAmbientMusic();
@@ -197,13 +225,24 @@ export class Game {
   triggerSuccess() {
     this.status = STATUS.SUCCESS;
     stopMusic();
-    markLevelComplete(this.levelIndex, LEVELS.length);
-    this.ui.showSuccess(this.level.name, this.levelIndex + 1 < LEVELS.length);
+    if (this.isCustomTest) {
+      // Return before touching any ui.show* method - the editor renders its
+      // own inline result, and ui.js stays unaware the editor exists.
+      this.customTestCallback?.('success');
+      return;
+    }
+    const totalLevels = getCombinedLevels().length;
+    markLevelComplete(this.levelIndex, totalLevels);
+    this.ui.showSuccess(this.level.name, this.levelIndex + 1 < totalLevels);
   }
 
   triggerFail() {
     this.status = STATUS.FAIL;
     stopMusic();
+    if (this.isCustomTest) {
+      this.customTestCallback?.('fail');
+      return;
+    }
     this.ui.showFail();
   }
 
@@ -272,18 +311,20 @@ export class Game {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    this._drawSky(ctx);
-    this._drawClouds(ctx, time);
+    drawSky(ctx, this.canvas.width, this.canvas.height);
+    drawClouds(ctx, this.clouds, time);
 
     if (this.status === STATUS.READY || this.status === STATUS.DRAWING) {
-      this._drawDrawZone(ctx);
+      drawDrawZone(ctx, this.canvas.width);
     }
 
     if (this.level) {
-      for (const p of this.level.platforms) this._drawPlatform(ctx, p);
+      for (const p of this.level.platforms) drawPlatform(ctx, p);
     }
 
-    for (const swing of this.swings) this._drawSwing(ctx, swing);
+    for (const swing of this.swings) {
+      drawSwingArm(ctx, swing.cfg.pivotX, swing.cfg.pivotY, swing.body.position.x, swing.body.position.y, swing.cfg.width, swing.cfg.height);
+    }
 
     for (const egg of this.eggs) egg.draw(ctx, time);
 
@@ -293,95 +334,7 @@ export class Game {
       drawBrushPath(ctx, this.drawing.points, STROKE_THICKNESS, COLORS.drawn);
     }
 
-    this._drawWater(ctx, time);
-  }
-
-  _drawDrawZone(ctx) {
-    ctx.fillStyle = COLORS.drawZone;
-    ctx.fillRect(0, 0, this.canvas.width, DRAW_ZONE_HEIGHT);
-    ctx.strokeStyle = COLORS.drawZoneEdge;
-    ctx.lineWidth = 2;
-    ctx.setLineDash([10, 8]);
-    ctx.beginPath();
-    ctx.moveTo(0, DRAW_ZONE_HEIGHT);
-    ctx.lineTo(this.canvas.width, DRAW_ZONE_HEIGHT);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  _drawSky(ctx) {
-    const grad = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
-    grad.addColorStop(0, COLORS.skyTop);
-    grad.addColorStop(1, COLORS.skyBottom);
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-  }
-
-  _drawClouds(ctx, time) {
-    ctx.fillStyle = COLORS.cloud;
-    for (const c of this.clouds) {
-      const x = c.baseX + Math.sin(time * c.freq + c.phase) * c.amplitude;
-      ctx.beginPath();
-      ctx.ellipse(x, c.y, c.size / 2, c.size * 0.32, 0, 0, Math.PI * 2);
-      ctx.ellipse(x + c.size * 0.32, c.y + c.size * 0.06, c.size * 0.34, c.size * 0.24, 0, 0, Math.PI * 2);
-      ctx.ellipse(x - c.size * 0.3, c.y + c.size * 0.08, c.size * 0.28, c.size * 0.2, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  _drawPlatform(ctx, p) {
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.rotate(((p.angle || 0) * Math.PI) / 180);
-    ctx.fillStyle = COLORS.platform;
-    ctx.beginPath();
-    ctx.roundRect(-p.width / 2, -p.height / 2, p.width, p.height, 8);
-    ctx.fill();
-    ctx.strokeStyle = COLORS.platformEdge;
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  _drawSwing(ctx, swing) {
-    const { cfg, body } = swing;
-    ctx.strokeStyle = COLORS.platformEdge;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(cfg.pivotX, cfg.pivotY);
-    ctx.lineTo(body.position.x, body.position.y);
-    ctx.stroke();
-
-    ctx.fillStyle = COLORS.platformEdge;
-    ctx.beginPath();
-    ctx.arc(cfg.pivotX, cfg.pivotY, 6, 0, Math.PI * 2);
-    ctx.fill();
-
-    this._drawPlatform(ctx, { x: body.position.x, y: body.position.y, width: cfg.width, height: cfg.height, angle: 0 });
-  }
-
-  _drawWater(ctx, time) {
-    const waterTop = DESIGN_HEIGHT - WATER_HEIGHT;
-    ctx.fillStyle = COLORS.water;
-    ctx.fillRect(0, waterTop, this.canvas.width, WATER_HEIGHT);
-
-    ctx.strokeStyle = COLORS.waterHighlight;
-    ctx.lineWidth = 4;
-    for (let row = 0; row < 3; row++) {
-      const y = waterTop + 18 + row * 22;
-      ctx.beginPath();
-      for (let x = 0; x <= DESIGN_WIDTH; x += 12) {
-        const wave = Math.sin(time * 2 + x * 0.05 + row) * 4;
-        if (x === 0) ctx.moveTo(x, y + wave);
-        else ctx.lineTo(x, y + wave);
-      }
-      ctx.stroke();
-    }
-
-    ctx.fillStyle = COLORS.waterFoam;
-    ctx.globalAlpha = 0.5 + Math.sin(time * 3) * 0.1;
-    ctx.fillRect(0, waterTop, this.canvas.width, 4);
-    ctx.globalAlpha = 1;
+    drawWater(ctx, this.canvas.width, this.canvas.height, time);
   }
 
   _drawDrawnBody(ctx) {
