@@ -1,4 +1,4 @@
-const CACHE = 'egg-draw-v3';
+const CACHE = 'egg-draw-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const ASSETS = [
   './js/ui.js',
   './js/levels.js',
   './js/egg.js',
+  './js/cat.js',
   './js/drawing.js',
   './js/physics.js',
   './js/progress.js',

@@ -25,6 +25,9 @@ export const COLORS = {
   eggShell: '#ffffff',
   eggShellShadow: '#ffe0b2',
   eggFeature: '#e53935',
+  catFur: '#b0aeb0',
+  catEarInner: '#f8c9d4',
+  catFeature: '#3e2723',
   drawn: '#1a1a1a',
 };
 
@@ -166,6 +169,7 @@ export function parseLevel(levelData) {
     name: levelData.name,
     platforms: (levelData.platforms || []).map((p) => ({ ...p })),
     eggs: levelData.eggs.map((e) => ({ ...e })),
+    cats: (levelData.cats || []).map((c) => ({ ...c })),
     swings: (levelData.swings || []).map((s) => ({ ...s })),
   };
 }

@@ -1,6 +1,7 @@
 import { DRAW_ZONE_HEIGHT, DEFAULT_EGG_WIDTH, DEFAULT_EGG_HEIGHT } from './levels.js';
 import { createClouds, drawSky, drawClouds, drawDrawZone, drawPlatform, drawSwingArm, drawWater } from './render.js';
 import { BadEgg } from './egg.js';
+import { Cat } from './cat.js';
 import { getDraft, saveDraft, publishDraft, getPublishedLevels, deleteCustomLevel } from './customLevels.js';
 
 const DEFAULT_SWING_WIDTH = 140;
@@ -10,7 +11,7 @@ const MIN_SWING_ARM_LENGTH = 20;
 const TOUCH_PADDING = 14; // extra hit-test radius on eggs so small ones stay tappable
 
 function blankDraft() {
-  return { name: '', platforms: [], eggs: [], swings: [], published: false, verifiedSnapshot: null };
+  return { name: '', platforms: [], eggs: [], cats: [], swings: [], published: false, verifiedSnapshot: null };
 }
 
 export class Editor {
@@ -20,10 +21,11 @@ export class Editor {
     this.active = false;
     this.rafId = null;
 
-    this.tool = 'select'; // 'select' | 'egg' | 'platform' | 'swing'
+    this.tool = 'select'; // 'select' | 'egg' | 'cat' | 'platform' | 'swing'
     this.draft = null;
-    this.selected = null; // { type: 'egg'|'platform'|'swing', index }
+    this.selected = null; // { type: 'egg'|'cat'|'platform'|'swing', index }
     this._previewEggs = [];
+    this._previewCats = [];
 
     this.dragStart = null; // in-progress platform/swing placement drag
     this.dragCurrent = null;
@@ -62,9 +64,12 @@ export class Editor {
   _newDraftIfNeeded() {
     if (this.draft) return;
     this.draft = getDraft() || blankDraft();
+    // Backfill for drafts saved before cats existed.
+    if (!this.draft.cats) this.draft.cats = [];
     this.selected = null;
     this.tool = 'select';
     this._syncPreviewEggs();
+    this._syncPreviewCats();
     this._refreshUI();
   }
 
@@ -90,9 +95,10 @@ export class Editor {
       else if (key === 'height') p.height = Math.max(10, p.height + delta);
       else if (key === 'angle') p.angle = (p.angle || 0) + delta;
       else if (key === 'stopper') p.isStopper = !p.isStopper;
-    } else if (type === 'egg') {
-      if (key === 'pinned') this.draft.eggs[index].pinned = true;
-      else if (key === 'rollable') this.draft.eggs[index].pinned = false;
+    } else if (type === 'egg' || type === 'cat') {
+      const item = (type === 'egg' ? this.draft.eggs : this.draft.cats)[index];
+      if (key === 'pinned') item.pinned = true;
+      else if (key === 'rollable') item.pinned = false;
     } else if (type === 'swing') {
       if (key === 'width') this.draft.swings[index].width = Math.max(40, this.draft.swings[index].width + delta);
     }
@@ -103,6 +109,7 @@ export class Editor {
     if (!this.selected) return;
     const { type, index } = this.selected;
     if (type === 'egg') this.draft.eggs.splice(index, 1);
+    else if (type === 'cat') this.draft.cats.splice(index, 1);
     else if (type === 'platform') this.draft.platforms.splice(index, 1);
     else if (type === 'swing') this.draft.swings.splice(index, 1);
     this.selected = null;
@@ -110,10 +117,18 @@ export class Editor {
   }
 
   clearDraft() {
-    if (this.draft.platforms.length === 0 && this.draft.eggs.length === 0 && this.draft.swings.length === 0) return;
-    if (!window.confirm('Clear all eggs, platforms, and swings from this level?')) return;
+    if (
+      this.draft.platforms.length === 0 &&
+      this.draft.eggs.length === 0 &&
+      this.draft.cats.length === 0 &&
+      this.draft.swings.length === 0
+    ) {
+      return;
+    }
+    if (!window.confirm('Clear all eggs, cats, platforms, and swings from this level?')) return;
     this.draft.platforms = [];
     this.draft.eggs = [];
+    this.draft.cats = [];
     this.draft.swings = [];
     this.draft.verifiedSnapshot = null;
     this.selected = null;
@@ -129,14 +144,20 @@ export class Editor {
       return;
     }
     this.deactivate();
-    const levelData = { name: this.draft.name, platforms: this.draft.platforms, eggs: this.draft.eggs, swings: this.draft.swings };
-    game.startCustomLevel(levelData, (result) => {
+    const levelData = {
+      name: this.draft.name,
+      platforms: this.draft.platforms,
+      eggs: this.draft.eggs,
+      cats: this.draft.cats,
+      swings: this.draft.swings,
+    };
+    game.startCustomLevel(levelData, (result, reason) => {
       if (result === 'success') {
         this.draft.verifiedSnapshot = this._snapshot();
         this._save();
         this.ui.setEditorMessage('Cleared it! You can publish now.');
       } else if (result === 'fail') {
-        this.ui.setEditorMessage("Didn't clear it in time - try again.");
+        this.ui.setEditorMessage(reason || "Didn't clear it in time - try again.");
       }
       this.activate();
       this.ui.showEditor();
@@ -169,7 +190,7 @@ export class Editor {
   // ---- Snapshot / persistence ----
 
   _snapshot(draft = this.draft) {
-    return JSON.stringify({ platforms: draft.platforms, eggs: draft.eggs, swings: draft.swings });
+    return JSON.stringify({ platforms: draft.platforms, eggs: draft.eggs, cats: draft.cats, swings: draft.swings });
   }
 
   _isVerified() {
@@ -179,6 +200,7 @@ export class Editor {
   _save() {
     this.draft = saveDraft(this.draft);
     this._syncPreviewEggs();
+    this._syncPreviewCats();
     this._refreshUI();
   }
 
@@ -196,6 +218,20 @@ export class Editor {
     });
   }
 
+  _syncPreviewCats() {
+    this._previewCats = this.draft.cats.map((c, i) => {
+      const body = { position: { x: c.x, y: c.y }, angle: 0 };
+      const existing = this._previewCats[i];
+      if (existing) {
+        existing.body = body;
+        existing.width = c.width;
+        existing.height = c.height;
+        return existing;
+      }
+      return new Cat(c, body);
+    });
+  }
+
   _refreshUI() {
     this.ui.setActiveTool(this.tool);
     this.ui.setTestEnabled(this.draft.eggs.length > 0);
@@ -207,7 +243,11 @@ export class Editor {
   _describeSelection() {
     if (!this.selected) return null;
     const { type, index } = this.selected;
-    const list = type === 'egg' ? this.draft.eggs : type === 'platform' ? this.draft.platforms : this.draft.swings;
+    const list =
+      type === 'egg' ? this.draft.eggs
+      : type === 'cat' ? this.draft.cats
+      : type === 'platform' ? this.draft.platforms
+      : this.draft.swings;
     if (index >= list.length) return null;
     return { type, index, data: list[index] };
   }
@@ -234,6 +274,10 @@ export class Editor {
 
     if (this.tool === 'egg') {
       this._placeEgg(p.x, p.y);
+      return;
+    }
+    if (this.tool === 'cat') {
+      this._placeCat(p.x, p.y);
       return;
     }
     if (this.tool === 'platform' || this.tool === 'swing') {
@@ -299,6 +343,12 @@ export class Editor {
     this._save();
   }
 
+  _placeCat(x, y) {
+    const pinned = !this._overlapsAnySwing(x, y);
+    this.draft.cats.push({ x, y, width: DEFAULT_EGG_WIDTH, height: DEFAULT_EGG_HEIGHT, pinned });
+    this._save();
+  }
+
   // A pinned (static) egg resting on a swing would just float in place,
   // decoupled from the plank the instant it starts moving - there's no
   // legitimate reason to want that combination, so this is a correction,
@@ -338,10 +388,10 @@ export class Editor {
 
   _applyMove(dx, dy) {
     const { type, index, originX, originY, originPivotX, originPivotY } = this.dragMove;
-    if (type === 'egg') {
-      const egg = this.draft.eggs[index];
-      egg.x = originX + dx;
-      egg.y = Math.max(originY + dy, DRAW_ZONE_HEIGHT);
+    if (type === 'egg' || type === 'cat') {
+      const item = (type === 'egg' ? this.draft.eggs : this.draft.cats)[index];
+      item.x = originX + dx;
+      item.y = Math.max(originY + dy, DRAW_ZONE_HEIGHT);
     } else if (type === 'platform') {
       const p = this.draft.platforms[index];
       p.x = originX + dx;
@@ -355,10 +405,15 @@ export class Editor {
     }
   }
 
-  // Eggs first (rendered on top / paint order last), then swings, then
-  // platforms - matches z-order so overlap ties resolve to whatever's
+  // Cats first (rendered on top / paint order last), then eggs, then swings,
+  // then platforms - matches z-order so overlap ties resolve to whatever's
   // visually on top.
   _hitTest(x, y) {
+    for (let i = this.draft.cats.length - 1; i >= 0; i--) {
+      const cat = this.draft.cats[i];
+      const r = (cat.width + cat.height) / 4 + TOUCH_PADDING;
+      if (Math.hypot(x - cat.x, y - cat.y) <= r) return { type: 'cat', index: i };
+    }
     for (let i = this.draft.eggs.length - 1; i >= 0; i--) {
       const egg = this.draft.eggs[i];
       const r = (egg.width + egg.height) / 4 + TOUCH_PADDING;
@@ -397,6 +452,7 @@ export class Editor {
     for (const p of this.draft.platforms) drawPlatform(ctx, p);
     for (const s of this.draft.swings) drawSwingArm(ctx, s.pivotX, s.pivotY, s.x, s.y, s.width, s.height);
     for (const egg of this._previewEggs) egg.draw(ctx, time);
+    for (const cat of this._previewCats) cat.draw(ctx, time);
 
     this._drawGhostPreview(ctx);
     this._drawSelectionHighlight(ctx);
@@ -430,7 +486,7 @@ export class Editor {
     ctx.lineWidth = 3;
     ctx.setLineDash([6, 5]);
 
-    if (this.selected.type === 'egg') {
+    if (this.selected.type === 'egg' || this.selected.type === 'cat') {
       const r = (item.width + item.height) / 4 + 6;
       ctx.beginPath();
       ctx.arc(item.x, item.y, r, 0, Math.PI * 2);

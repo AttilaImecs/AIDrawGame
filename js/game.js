@@ -1,7 +1,8 @@
 import { parseLevel, COLORS, DESIGN_WIDTH, DESIGN_HEIGHT, WATER_HEIGHT } from './levels.js';
-import { createWorld, addPlatform, addSwingPlatform, addEgg, addWater, addWorldBounds, addDrawnBody, removeBody, step, onCollisionStart } from './physics.js';
+import { createWorld, addPlatform, addSwingPlatform, addEgg, addCat, addWater, addWorldBounds, addDrawnBody, removeBody, step, onCollisionStart } from './physics.js';
 import { Drawing, drawBrushPath, STROKE_THICKNESS } from './drawing.js';
 import { BadEgg } from './egg.js';
+import { Cat, CAT_FAIL_DELAY } from './cat.js';
 import { Timer } from './timer.js';
 import { playAmbientMusic, stopMusic } from './music.js';
 import { getUnlockedCount, markLevelComplete } from './progress.js';
@@ -34,11 +35,14 @@ export class Game {
     this.engine = null;
     this.level = null;
     this.eggs = [];
+    this.cats = [];
     this.swings = [];
     this.drawnBody = null;
     this.drawnLocalPoints = null;
     this.pendingSuccess = false;
     this.successTimer = 0;
+    this.catKilled = false;
+    this.catFailTimer = 0;
     this.isCustomTest = false;
     this.customTestCallback = null;
     this._customLevelData = null;
@@ -157,6 +161,8 @@ export class Game {
     this.timer.reset();
     this.pendingSuccess = false;
     this.successTimer = 0;
+    this.catKilled = false;
+    this.catFailTimer = 0;
     this.drawing.reset();
     this.drawing.enabled = true;
     this.status = STATUS.READY;
@@ -170,6 +176,7 @@ export class Game {
     this.engine = createWorld();
     for (const p of this.level.platforms) addPlatform(this.engine, p);
     this.eggs = this.level.eggs.map((e) => new BadEgg(e, addEgg(this.engine, e)));
+    this.cats = this.level.cats.map((c) => new Cat(c, addCat(this.engine, c)));
     this.swings = this.level.swings.map((cfg) => ({ cfg, body: addSwingPlatform(this.engine, cfg) }));
     addWater(this.engine, {
       x: DESIGN_WIDTH / 2,
@@ -192,6 +199,9 @@ export class Game {
     if (labels.includes('water') && labels.includes('egg')) {
       this._crackEggByBody(a.label === 'egg' ? a : b);
     }
+    if (labels.includes('drawn') && labels.includes('cat')) {
+      this._killCatByBody(a.label === 'cat' ? a : b);
+    }
   }
 
   _crackEggByBody(body) {
@@ -199,6 +209,14 @@ export class Game {
     if (!egg) return;
     egg.crack();
     removeBody(this.engine, body);
+  }
+
+  _killCatByBody(body) {
+    const cat = this.cats.find((c) => c.body === body && !c.killed);
+    if (!cat) return;
+    cat.kill();
+    removeBody(this.engine, body);
+    this.catKilled = true;
   }
 
   _onDrawStart() {
@@ -236,14 +254,14 @@ export class Game {
     this.ui.showSuccess(this.level.name, this.levelIndex + 1 < totalLevels);
   }
 
-  triggerFail() {
+  triggerFail(reason = 'Out of time!') {
     this.status = STATUS.FAIL;
     stopMusic();
     if (this.isCustomTest) {
-      this.customTestCallback?.('fail');
+      this.customTestCallback?.('fail', reason);
       return;
     }
-    this.ui.showFail();
+    this.ui.showFail(reason);
   }
 
   // ---- Loop ----
@@ -283,6 +301,15 @@ export class Game {
 
     for (const egg of this.eggs) egg.update(dt);
     this.eggs = this.eggs.filter((egg) => !egg.isFinished());
+    for (const cat of this.cats) cat.update(dt);
+
+    if (this.catKilled) {
+      this.catFailTimer += dt;
+      if (this.catFailTimer >= CAT_FAIL_DELAY) {
+        this.triggerFail('You hurt the cat! Try again.');
+      }
+      return;
+    }
 
     const remaining = this.eggs.filter((e) => !e.cracked).length;
 
@@ -327,6 +354,7 @@ export class Game {
     }
 
     for (const egg of this.eggs) egg.draw(ctx, time);
+    for (const cat of this.cats) cat.draw(ctx, time);
 
     if (this.drawnBody) {
       this._drawDrawnBody(ctx);

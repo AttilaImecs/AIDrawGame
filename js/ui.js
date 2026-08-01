@@ -11,6 +11,7 @@ export class UI {
     this.screenFail = document.getElementById('screen-fail');
 
     this.successText = document.getElementById('success-text');
+    this.failText = document.getElementById('fail-text');
 
     this.btnPlay = document.getElementById('btn-play');
     this.btnLevelSelectMenu = document.getElementById('btn-level-select-menu');
@@ -99,8 +100,9 @@ export class UI {
     this.screenSuccess.classList.remove('hidden');
   }
 
-  showFail() {
+  showFail(message) {
     this.hideAllScreens();
+    this.failText.textContent = message || 'Out of time!';
     this.screenFail.classList.remove('hidden');
   }
 
@@ -168,7 +170,7 @@ export class UI {
       stopperBtn.textContent = data.isStopper ? 'Stopper: On' : 'Stopper: Off';
       stopperBtn.dataset.action = 'stopper';
       this.editorPropertyPanel.appendChild(stopperBtn);
-    } else if (type === 'egg') {
+    } else if (type === 'egg' || type === 'cat') {
       const pinned = data.pinned !== false;
       const pinnedBtn = document.createElement('button');
       pinnedBtn.className = `btn ${pinned ? 'btn-primary' : 'btn-secondary'}`;

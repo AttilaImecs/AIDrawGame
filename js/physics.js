@@ -34,6 +34,10 @@ const LOW_STATIC_FRICTION = 0.05;
 const CATEGORY_DEFAULT = 0x0001;
 const CATEGORY_STOPPER = 0x0002;
 const CATEGORY_DRAWN = 0x0004;
+// World-bound walls get their own category so a swing platform's mask can
+// exclude them specifically (see addSwingPlatform), while every other body
+// keeps colliding with them via the normal 0xffffffff default mask.
+const CATEGORY_BOUNDS = 0x0008;
 
 export function addPlatform(engine, { x, y, width, height, angle = 0, isStopper = false }) {
   const body = Bodies.rectangle(x, y, width, height, {
@@ -57,7 +61,7 @@ export function addPlatform(engine, { x, y, width, height, angle = 0, isStopper 
 // false for any egg meant to ride a swing platform: a static body doesn't
 // respond to contact forces at all, so the plank would just swing out from
 // under it instead of carrying it along.
-export function addEgg(engine, { x, y, width, height, pinned = false }) {
+function addCircleBody(engine, { x, y, width, height, pinned, label }) {
   const radius = (width + height) / 4;
   const body = Bodies.circle(x, y, radius, {
     isStatic: pinned,
@@ -66,10 +70,23 @@ export function addEgg(engine, { x, y, width, height, pinned = false }) {
     frictionAir: 0.01,
     restitution: 0.2,
     density: 0.002,
-    label: 'egg',
+    label,
   });
   World.add(engine.world, body);
   return body;
+}
+
+export function addEgg(engine, { x, y, width, height, pinned = false }) {
+  return addCircleBody(engine, { x, y, width, height, pinned, label: 'egg' });
+}
+
+// Same body as an egg (see addEgg), just labeled 'cat' so game.js routes a
+// collision with the drawn shape to a fail instead of a crack - the cat is
+// meant to be avoided, not popped. Shares the same swing-compatibility rule:
+// a cat resting on a swing must stay pinned:false or the plank swings out
+// from under it.
+export function addCat(engine, { x, y, width, height, pinned = false }) {
+  return addCircleBody(engine, { x, y, width, height, pinned, label: 'cat' });
 }
 
 // Invisible walls just outside the left/right canvas edges. Without these,
@@ -86,11 +103,13 @@ export function addWorldBounds(engine, width, height) {
     isStatic: true,
     friction: 0,
     label: 'platform',
+    collisionFilter: { category: CATEGORY_BOUNDS, mask: 0xffffffff },
   });
   const right = Bodies.rectangle(width + thickness / 2, height / 2, thickness, height * 3, {
     isStatic: true,
     friction: 0,
     label: 'platform',
+    collisionFilter: { category: CATEGORY_BOUNDS, mask: 0xffffffff },
   });
   World.add(engine.world, [left, right]);
   return [left, right];
@@ -166,6 +185,12 @@ export function addSwingPlatform(engine, { pivotX, pivotY, x, y, width, height }
     friction: 0.9,
     frictionAir: 0.001,
     label: 'platform',
+    // Excludes the invisible edge walls (see addWorldBounds). The pendulum's
+    // arc is already fully pinned by its rigid rod length, so it can never
+    // actually leave the canvas - letting it also collide with the edge
+    // walls just fought the constraint's own math, visibly sticking the
+    // plank at the wall for a beat before it kicked back the other way.
+    collisionFilter: { category: CATEGORY_DEFAULT, mask: 0xffffffff & ~CATEGORY_BOUNDS },
   });
   Body.setInertia(body, Infinity);
   const constraint = Constraint.create({
