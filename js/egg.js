@@ -5,6 +5,13 @@ const BLINK_DURATION = 0.15;
 const SHARD_COUNT = 14;
 const SHARD_LIFETIME = 0.8;
 const SHARD_GRAVITY = 400;
+// Laughing is driven purely by `time` (like blinking) so it keeps animating
+// even before the player throws anything, when update(dt) is never called.
+// Each egg gets its own randomized cycle length and offset so a room full of
+// eggs doesn't all cackle in unison or on an obviously fixed beat.
+const LAUGH_MIN_CYCLE = 4;
+const LAUGH_MAX_CYCLE = 9;
+const LAUGH_DURATION = 0.6;
 
 export class BadEgg {
   constructor(config, body) {
@@ -16,6 +23,8 @@ export class BadEgg {
     this.shards = [];
     // Stagger blink timing per egg so multiple eggs don't blink in unison.
     this.blinkOffset = Math.random() * BLINK_CYCLE;
+    this.laughCycle = LAUGH_MIN_CYCLE + Math.random() * (LAUGH_MAX_CYCLE - LAUGH_MIN_CYCLE);
+    this.laughOffset = Math.random() * this.laughCycle;
   }
 
   get x() {
@@ -73,8 +82,15 @@ export class BadEgg {
     const rx = this.width / 2;
     const ry = this.height / 2;
 
+    const laughPhase = (time + this.laughOffset) % this.laughCycle;
+    const laughing = laughPhase < LAUGH_DURATION;
+    const laughT = laughing ? laughPhase / LAUGH_DURATION : 0;
+    // A quick side-to-side wobble that eases out over the laugh, like the
+    // egg is shaking with cackling.
+    const shakeX = laughing ? Math.sin(laughT * Math.PI * 9) * rx * 0.05 * Math.sin(laughT * Math.PI) : 0;
+
     ctx.save();
-    ctx.translate(this.x, this.y);
+    ctx.translate(this.x + shakeX, this.y);
     ctx.rotate(this.body.angle);
 
     ctx.fillStyle = COLORS.eggShell;
@@ -90,7 +106,9 @@ export class BadEgg {
     ctx.globalAlpha = 1;
 
     const phase = (time + this.blinkOffset) % BLINK_CYCLE;
-    const blinking = phase < BLINK_DURATION;
+    // Laughing squints the eyes shut too, not just a blink - reuses the same
+    // closed-eye line so a laughing egg doesn't need a third eye state.
+    const blinking = phase < BLINK_DURATION || laughing;
     const eyeDX = rx * 0.32;
     const eyeY = 0;
     const eyeRadius = rx * 0.11;
@@ -136,10 +154,29 @@ export class BadEgg {
       ctx.stroke();
     }
 
-    // Evil smile
-    ctx.beginPath();
-    ctx.arc(0, ry * 0.3, rx * 0.45, 0.15 * Math.PI, 0.85 * Math.PI);
-    ctx.stroke();
+    if (laughing) {
+      // Wide cackling mouth - pops open and shut across the laugh instead of
+      // holding one static shape, so it reads as a beat of laughter.
+      const openAmount = Math.sin(laughT * Math.PI);
+      const mouthW = rx * 0.42;
+      const mouthH = ry * (0.1 + 0.24 * openAmount);
+      ctx.fillStyle = '#7a1f1f';
+      ctx.beginPath();
+      ctx.ellipse(0, ry * 0.35, mouthW, mouthH, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = COLORS.eggShell;
+      ctx.lineWidth = Math.max(1.5, rx * 0.06);
+      ctx.beginPath();
+      ctx.moveTo(-mouthW * 0.7, ry * 0.35 - mouthH * 0.55);
+      ctx.lineTo(mouthW * 0.7, ry * 0.35 - mouthH * 0.55);
+      ctx.stroke();
+    } else {
+      // Evil smile
+      ctx.strokeStyle = COLORS.eggFeature;
+      ctx.beginPath();
+      ctx.arc(0, ry * 0.3, rx * 0.45, 0.15 * Math.PI, 0.85 * Math.PI);
+      ctx.stroke();
+    }
 
     ctx.restore();
   }
